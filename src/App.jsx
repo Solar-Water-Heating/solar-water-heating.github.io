@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import './App.css'
 import { ParametersPanel } from './components/ParametersPanel'
 import { PlotPanel } from './components/PlotPanel'
+import { RemarksPanel } from './components/RemarksPanel'
 import {
   calculateSolarIrradiance,
   calculatePanelEfficiency,
@@ -230,8 +231,8 @@ function App() {
   const axisConfig = getAxisTitles()
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 py-6">
+      <div className="mx-1">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-white mb-2">Physics Simulator</h1>
@@ -239,9 +240,9 @@ function App() {
         </div>
 
         {/* Main Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-200px)] min-h-0">
-          {/* Parameters Panel - 1/4 width */}
-          <div className="lg:col-span-1 min-h-0 flex flex-col">
+        <div className="grid grid-cols-1 lg:grid-cols-10 gap-2 h-[calc(100vh-200px)] min-h-0">
+          {/* Parameters Panel - 20% width */}
+          <div className="lg:col-span-2 min-h-0 flex flex-col">
             <ParametersPanel
               sections={SECTIONS}
               parameters={parameters}
@@ -256,8 +257,8 @@ function App() {
             />
           </div>
 
-          {/* Plot Panel - 3/4 width */}
-          <div className="lg:col-span-3 min-h-0 flex flex-col">
+          {/* Plot Panel - 60% width */}
+          <div className="lg:col-span-6 min-h-0 flex flex-col">
             <PlotPanel
               data={plotData}
               title={axisConfig.title}
@@ -265,6 +266,11 @@ function App() {
               yAxisLabel={axisConfig.y}
               subplots={lastUpdatedSection === 'solarPanel' || lastUpdatedSection === 'storageTank'}
             />
+          </div>
+
+          {/* Remarks Panel - 20% width */}
+          <div className="lg:col-span-2 min-h-0 flex flex-col">
+            <RemarksPanel activeSection={activeSection} />
           </div>
         </div>
 

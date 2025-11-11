@@ -231,8 +231,8 @@ export const PlotPanel = ({ data, title = "Simulation Results", xAxisLabel = "Ti
         <CardHeader className="flex-shrink-0">
           <CardTitle>{title}</CardTitle>
         </CardHeader>
-        <CardContent className="flex-1 min-h-0 p-6 pt-0 overflow-y-auto">
-          <div className="grid grid-cols-1 gap-4 w-full" style={{ minHeight: `${totalHeight}px` }}>
+        <CardContent className="flex-1 min-h-0 p-2 pt-0 overflow-y-auto">
+          <div className="grid grid-cols-1 gap-2 w-full" style={{ minHeight: `${totalHeight}px` }}>
             {subplotGroups.map((group, idx) => (
               <div key={idx} className="w-full" style={{ height: '300px' }}>
                 <ChartComponent 
@@ -254,7 +254,7 @@ export const PlotPanel = ({ data, title = "Simulation Results", xAxisLabel = "Ti
       <CardHeader className="flex-shrink-0">
         <CardTitle>{title}</CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 min-h-0 p-6 pt-0">
+      <CardContent className="flex-1 min-h-0 p-2 pt-0">
         <div className="w-full h-full">
           <ResponsiveLine
             data={displayData}
