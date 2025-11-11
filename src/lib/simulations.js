@@ -100,14 +100,6 @@ export const calculatePanelOutput = (solarIrradiance, panelTemp, tankTemp, ambie
   const efficiency = calculatePanelEfficiency(panelTemp, efficiencyRef, panelRefTemp, panelTempCoefficient)
   const solarCollected = solarIrradiance * panelArea * efficiency
 
-  // Heat loss from panel to ambient (proportional to temperature difference)
-  // U_panel is heat transfer coefficient for panel surface
-  const heatLossFromPanel = panelUValue * panelArea * (panelTemp - ambientTemp)
-  console.log('panelTemp', panelUValue , panelArea , (panelTemp - ambientTemp))
-  console.log('solarCollected', solarCollected)
-  console.log('heatLossFromPanel', heatLossFromPanel)
-  // Net heat transferred to fluid
-  const netHeat = solarCollected - heatLossFromPanel
   return Math.max(0, solarCollected)
 }
 
