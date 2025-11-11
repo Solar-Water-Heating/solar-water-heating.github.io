@@ -236,7 +236,7 @@ function App() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-white mb-2">Physics Simulator</h1>
-          <p className="text-slate-300">Projectile Motion Simulator with Interactive Parameters</p>
+          <p className="text-slate-300">Heat Transfer from a Solar Panel to a Water Storage Tank</p>
         </div>
 
         {/* Main Layout */}
