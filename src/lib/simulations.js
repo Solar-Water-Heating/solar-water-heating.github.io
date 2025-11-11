@@ -27,43 +27,104 @@ export const calculateSolarIrradiance = (t, params) => {
 
 /**
  * Calculate panel efficiency based on temperature
- * @param {number} panelTemp - Panel temperature in °C
- * @param {number} ambientTemp - Ambient temperature in °C
- * @param {number} efficiencyRef - Reference efficiency (at 25°C)
- * @returns {number} Efficiency as a decimal (0-1)
+ * Model temperature-dependent panel efficiency.
+ * Efficiency decreases as panel temperature increases.
+ * 
+ * Typical temperature coefficient: ~0.4-0.5% per °C above reference (25°C)
+ * 
+ * @param {number} panelTemp - Current panel temperature (°C)
+ * @param {number} efficiencyRef - Reference efficiency at standard conditions
+ * @param {number} panelRefTemp - Reference temperature for efficiency rating (°C). Default: 25°C
+ * @param {number} panelTempCoefficient - Temperature coefficient for efficiency loss (fraction per °C). Default: 0.004
+ * @returns {number} Efficiency as a decimal (0-1), clamped between 0.1 and efficiency_ref
  */
-export const calculatePanelEfficiency = (panelTemp, ambientTemp, efficiencyRef) => {
-  const refTemp = 25.0
-  const tempCoefficient = 0.004 // -0.4% per °C
-  let efficiency = efficiencyRef * (1 - tempCoefficient * (panelTemp - refTemp))
+export const calculatePanelEfficiency = (panelTemp, efficiencyRef, panelRefTemp = 25.0, panelTempCoefficient = 0.004) => {
+  let efficiency = efficiencyRef * (1 - panelTempCoefficient * (panelTemp - panelRefTemp))
   efficiency = Math.max(0.1, Math.min(efficiency, efficiencyRef))
   return efficiency
 }
 
 /**
  * Calculate panel temperature at equilibrium
+ * At equilibrium: solar_in = heat_loss_to_ambient
+ * panel_solar = U_panel * A_panel * (T_panel - T_ambient)
+ * Solving for T_panel: T_panel = T_ambient + (panel_solar / (U_panel * A_panel))
+ * 
  * @param {number} irradiance - Solar irradiance in W/m²
  * @param {number} ambientTemp - Ambient temperature in °C
  * @param {number} panelArea - Panel area in m²
  * @param {number} efficiencyRef - Reference efficiency
- * @param {number} tankTemp - Tank temperature in °C
  * @param {number} panelUValue - Panel U-value in W/(m²*K)
+ * @param {number} panelRefTemp - Reference temperature for efficiency rating in °C
+ * @param {number} panelTempCoefficient - Temperature coefficient for efficiency loss
  * @returns {number} Panel temperature in °C
  */
-export const calculatePanelTemperature = (irradiance, ambientTemp, panelArea, efficiencyRef, tankTemp, panelUValue) => {
-  // Heat loss coefficient for panel surface
-  const uPanel = panelUValue // W/(m²*K)
-
-  // Solar energy collected
-  const efficiency = calculatePanelEfficiency(ambientTemp + 20, ambientTemp, efficiencyRef)
-  const solarCollected = irradiance * panelArea * efficiency
-
-  // Estimate panel temperature where solar gain ≈ losses
-  if (solarCollected > 0) {
-    return ambientTemp + (solarCollected / (uPanel * panelArea))
-  } else {
+export const calculatePanelTemperature = (irradiance, ambientTemp, panelArea, efficiencyRef, panelUValue, panelRefTemp = 25.0, panelTempCoefficient = 0.004) => {
+  // At equilibrium: solar_in * efficiency = heat_loss_to_ambient
+  // We need to solve: irradiance * panelArea * efficiency(T) = panelUValue * panelArea * (T - ambientTemp)
+  // This requires iteration since efficiency is temperature-dependent
+  
+  if (irradiance <= 0) {
     return ambientTemp
   }
+
+  // Use iterative approach to find equilibrium temperature
+  let panelTemp = ambientTemp
+  for (let i = 0; i < 10; i++) {
+    const efficiency = calculatePanelEfficiency(panelTemp, efficiencyRef, panelRefTemp, panelTempCoefficient)
+    const solarCollected = irradiance * panelArea * efficiency
+    panelTemp = ambientTemp + (solarCollected / (panelUValue * panelArea))
+  }
+  
+  return panelTemp
+}
+
+/**
+ * Calculate heat output from the solar panel to the tank
+ * The panel collects solar energy but also loses heat to the environment.
+ * Net output = solar_collected - heat_loss_from_panel
+ * 
+ * @param {number} solarIrradiance - Solar irradiance in W/m²
+ * @param {number} panelTemp - Panel temperature in °C
+ * @param {number} tankTemp - Tank temperature in °C
+ * @param {number} ambientTemp - Ambient temperature in °C
+ * @param {number} panelArea - Panel area in m²
+ * @param {number} panelUValue - Panel U-value in W/(m²*K)
+ * @param {number} efficiencyRef - Reference efficiency
+ * @param {number} panelRefTemp - Reference temperature for efficiency rating in °C
+ * @param {number} panelTempCoefficient - Temperature coefficient for efficiency loss
+ * @returns {number} Heat power output in Watts
+ */
+export const calculatePanelOutput = (solarIrradiance, panelTemp, tankTemp, ambientTemp, panelArea, panelUValue = 5.0, efficiencyRef = 0.70, panelRefTemp = 25.0, panelTempCoefficient = 0.004) => {
+  // Collect solar energy (accounting for temperature-dependent efficiency)
+  const efficiency = calculatePanelEfficiency(panelTemp, efficiencyRef, panelRefTemp, panelTempCoefficient)
+  const solarCollected = solarIrradiance * panelArea * efficiency
+
+  // Heat loss from panel to ambient (proportional to temperature difference)
+  // U_panel is heat transfer coefficient for panel surface
+  const heatLossFromPanel = panelUValue * panelArea * (panelTemp - ambientTemp)
+  console.log('panelTemp', panelUValue , panelArea , (panelTemp - ambientTemp))
+  console.log('solarCollected', solarCollected)
+  console.log('heatLossFromPanel', heatLossFromPanel)
+  // Net heat transferred to fluid
+  const netHeat = solarCollected - heatLossFromPanel
+  return Math.max(0, solarCollected)
+}
+
+/**
+ * Calculate heat loss from storage tank to environment
+ * Q_loss = U * A * ΔT
+ * 
+ * @param {number} tankTemp - Tank temperature in °C
+ * @param {number} ambientTemp - Ambient temperature in °C
+ * @param {number} surfaceArea - Tank surface area in m²
+ * @param {number} uValue - Heat transfer coefficient in W/(m²*K)
+ * @returns {number} Heat loss power in Watts
+ */
+export const calculateTankHeatLoss = (tankTemp, ambientTemp, surfaceArea, uValue) => {
+  const deltaT = tankTemp - ambientTemp
+  const heatLoss = uValue * surfaceArea * deltaT
+  return Math.max(0, heatLoss)
 }
 
 /**
@@ -99,9 +160,7 @@ export const simulateSolarIrradiance = (parameters) => {
  */
 export const simulateSolarPanel = (parameters) => {
   const { irradianceStartHour, irradianceEndHour, irradiancePeakHour, solarIrradiancePeak } = parameters
-  const { panelArea, panelEfficiencyRef, panelMaxTemp, panelUValue } = parameters
-  const ambientTemp = 25.0 // Assume constant ambient temperature
-  const tankTemp = 40.0 // Assume constant tank temperature for this simulation
+  const { panelArea, panelEfficiencyRef, panelMaxTemp, panelUValue, panelRefTemp, panelTempCoefficient, ambientTemp } = parameters
 
   const panelTempData = []
   const ambientTempData = []
@@ -112,17 +171,12 @@ export const simulateSolarPanel = (parameters) => {
 
   for (let t = 0; t < hoursInDay; t += 0.5) {
     const irradiance = calculateSolarIrradiance(t, parameters)
-    const panelTemp = calculatePanelTemperature(irradiance, ambientTemp, panelArea, panelEfficiencyRef, tankTemp, panelUValue)
-    const efficiency = calculatePanelEfficiency(panelTemp, ambientTemp, panelEfficiencyRef)
+    const panelTemp = calculatePanelTemperature(irradiance, ambientTemp, panelArea, panelEfficiencyRef, panelUValue, panelRefTemp, panelTempCoefficient)
+    const efficiency = calculatePanelEfficiency(panelTemp, panelEfficiencyRef, panelRefTemp, panelTempCoefficient)
 
-    // Calculate heat loss from panel
-    const uPanel = panelUValue
-    const heatLossFromPanel = uPanel * panelArea * (panelTemp - ambientTemp)
-
-    // Calculate net heat output
-    const solarCollected = irradiance * panelArea * efficiency
-    const heatOutput = Math.max(0, solarCollected - heatLossFromPanel)
-
+    // Calculate net heat output from panel
+    const heatOutput = calculatePanelOutput(irradiance, panelTemp, ambientTemp, ambientTemp, panelArea, panelUValue, panelEfficiencyRef, panelRefTemp, panelTempCoefficient)
+    console.log('heatOutput', heatOutput)
     panelTempData.push({
       x: parseFloat(t.toFixed(2)),
       y: parseFloat(Math.min(panelTemp, panelMaxTemp).toFixed(2)),
@@ -171,11 +225,28 @@ export const simulateSolarPanel = (parameters) => {
 
 /**
  * Simulate storage tank temperature profile over 24 hours
+ * Implements full energy balance with time-varying solar input and dynamic heat loss
+ * 
  * @param {object} parameters - All simulation parameters
  * @returns {array} Array of plot data series
  */
 export const simulateStorageTank = (parameters) => {
-  const { tankVolume, initialTankTemp, tankSurfaceArea, tankInsulationUValue, massFlowRate, ambientTemp, panelArea, panelEfficiencyRef, panelUValue, irradianceStartHour, irradianceEndHour, irradiancePeakHour, solarIrradiancePeak } = parameters
+  const {
+    tankVolume,
+    initialTankTemp,
+    tankSurfaceArea,
+    tankInsulationUValue,
+    ambientTemp,
+    panelArea,
+    panelEfficiencyRef,
+    panelUValue,
+    panelRefTemp,
+    panelTempCoefficient,
+    irradianceStartHour,
+    irradianceEndHour,
+    irradiancePeakHour,
+    solarIrradiancePeak,
+  } = parameters
 
   const tankMass = tankVolume // kg (1 liter ~ 1 kg)
   const specificHeat = 4186 // J/(kg*K) for water
@@ -183,7 +254,6 @@ export const simulateStorageTank = (parameters) => {
   const totalTime = 24 * 3600 // 24 hours
   const numSteps = Math.floor(totalTime / dt)
   const samplingInterval = 3600 // sample every hour (3600 seconds)
-  const uPanel = 5.0 // W/(m²*K) - hardcoded panel U-value for heat loss calc (not the configurable panelUValue)
 
   const tankTempData = []
   const heatInData = []
@@ -216,7 +286,7 @@ export const simulateStorageTank = (parameters) => {
     const currentTime = i * dt
     const timeHours = currentTime / 3600
 
-    // Calculate solar irradiance
+    // Calculate solar irradiance for this timestep
     let irradiance = 0
     if (timeHours >= irradianceStartHour && timeHours <= irradianceEndHour) {
       const fractionOfDay = (timeHours - irradianceStartHour) / (irradianceEndHour - irradianceStartHour)
@@ -225,31 +295,29 @@ export const simulateStorageTank = (parameters) => {
       irradiance = Math.max(0, irradiance)
     }
 
-    // Calculate panel temperature using hardcoded U-value (5.0 W/(m²*K))
+    // Calculate panel temperature at equilibrium
     let panelTemp = ambientTemp
     if (irradiance > 0) {
       const solarCollected = irradiance * panelArea * panelEfficiencyRef
-      panelTemp = ambientTemp + (solarCollected / (uPanel * panelArea))
+      panelTemp = ambientTemp + (solarCollected / (panelUValue * panelArea))
     }
 
-    // Calculate heat from panel to tank
-    // Temperature-dependent efficiency (same as Python: -0.4% per °C above 25°C)
-    let efficiency = panelEfficiencyRef * (1 - 0.004 * (panelTemp - 25))
-    efficiency = Math.max(0.1, Math.min(efficiency, panelEfficiencyRef)) // Clamp between 10% and reference
+    // Calculate heat output from panel to tank
+    const qPanel = calculatePanelOutput(irradiance, panelTemp, currentTankTemp, ambientTemp, panelArea, panelUValue, panelEfficiencyRef, panelRefTemp, panelTempCoefficient)
 
-    const solarCollected = irradiance * panelArea * efficiency
-    const heatLossFromPanel = uPanel * panelArea * (panelTemp - ambientTemp)
-    const qPanel = Math.max(0, solarCollected - heatLossFromPanel)
-
-    // Calculate tank heat loss
-    const qTankLoss = tankInsulationUValue * tankSurfaceArea * (currentTankTemp - ambientTemp)
+    // Calculate tank heat loss to environment
+    const qTankLoss = calculateTankHeatLoss(currentTankTemp, ambientTemp, tankSurfaceArea, tankInsulationUValue)
 
     // Store current values for sampling
     lastQPanel = qPanel
     lastQTankLoss = qTankLoss
 
-    // Energy balance
+    // Energy balance: net energy into tank per timestep
+    // Q_net = (heat_in - heat_loss) * dt (in Joules)
     const qNet = (qPanel - qTankLoss) * dt
+
+    // Update tank temperature
+    // ΔT = Q / (m * c_p)
     const deltaT = qNet / (tankMass * specificHeat)
     currentTankTemp = Math.max(ambientTemp, currentTankTemp + deltaT)
 
@@ -355,4 +423,3 @@ export const simulateProjectileMotion = (parameters) => {
     },
   ]
 }
-

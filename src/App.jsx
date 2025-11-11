@@ -9,11 +9,18 @@ import {
   simulateSolarIrradiance,
   simulateSolarPanel,
   simulateStorageTank,
-  simulateProjectileMotion,
 } from './lib/simulations'
 
 // Section configurations with their default parameters
 const SECTIONS = {
+  simulationParameters: {
+    id: 'simulationParameters',
+    title: 'Simulation Parameters',
+    parameters: {
+      ambientTemp: 20.0,
+      massFlowRate: 0.05,
+    },
+  },
   solarIrradiance: {
     id: 'solarIrradiance',
     title: 'Solar Irradiance',
@@ -31,9 +38,11 @@ const SECTIONS = {
       panelArea: 2.0,
       panelEfficiencyRef: 0.70,
       panelMaxTemp: 80.0,
-      panelUValue: 5.0,
+      panelUValue: 10.0,
+      panelRefTemp: 25.0,
+      panelTempCoefficient: 0.004,
     },
-    dependencies: ['solarIrradiance'],
+    dependencies: ['solarIrradiance', 'simulationParameters'],
   },
   storageTank: {
     id: 'storageTank',
@@ -43,135 +52,76 @@ const SECTIONS = {
       initialTankTemp: 20.0,
       tankSurfaceArea: 2.0,
       tankInsulationUValue: 0.5,
-      massFlowRate: 0.05,
-      ambientTemp: 20.0,
     },
-    dependencies: ['solarPanel'],
-  },
-  motion: {
-    id: 'motion',
-    title: 'Projectile Motion',
-    parameters: {
-      initialVelocity: 20,
-      angle: 45,
-      gravity: 9.81,
-    },
-  },
-  resistance: {
-    id: 'resistance',
-    title: 'Air Resistance',
-    parameters: {
-      mass: 1,
-      resistance: 0.1,
-      dragCoefficient: 0.5,
-    },
-    dependencies: ['motion'],
-  },
-  environment: {
-    id: 'environment',
-    title: 'Environmental Factors',
-    parameters: {
-      windSpeed: 5,
-      windAngle: 0,
-      altitude: 0,
-    },
-    dependencies: ['motion'],
+    dependencies: ['solarPanel', 'simulationParameters'],
   },
 }
 
 // Parameter descriptions and metadata
 const PARAMETER_DESCRIPTIONS = {
   irradianceStartHour: {
-    label: 'Start Hour',
+    label: 'Start Hour (h)',
     description: 'Hour of day when solar irradiance becomes non-zero (sunrise). Typical: 6 AM.',
   },
   irradianceEndHour: {
-    label: 'End Hour',
+    label: 'End Hour (h)',
     description: 'Hour of day when solar irradiance becomes zero (sunset). Typical: 6 PM.',
   },
   irradiancePeakHour: {
-    label: 'Peak Hour',
+    label: 'Peak Hour (h)',
     description: 'Hour of day at which solar irradiance reaches maximum (solar noon). Typical: 12 PM.',
   },
   solarIrradiancePeak: {
-    label: 'Peak Solar Irradiance',
+    label: 'Peak Solar Irradiance (W/m²)',
     description: 'Maximum solar radiation intensity in W/m² during peak daylight. Standard value: 1000 W/m² at sea level on clear day.',
   },
   panelArea: {
-    label: 'Panel Area',
+    label: 'Panel Area (m²)',
     description: 'Total surface area of the solar panel in square meters. Larger area increases energy collection capacity.',
   },
   panelEfficiencyRef: {
-    label: 'Panel Efficiency',
+    label: 'Panel Efficiency (%)',
     description: 'Reference efficiency at standard test conditions (25°C). Typical solar panels: 15-22%. Higher efficiency means better energy conversion.',
   },
   panelMaxTemp: {
-    label: 'Max Panel Temp',
+    label: 'Max Panel Temp (°C)',
     description: 'Maximum safe operating temperature for the panel in °C. Efficiency decreases as temperature increases due to thermal effects.',
   },
   panelUValue: {
-    label: 'Panel U-Value',
+    label: 'Panel U-Value (W/m²·K)',
     description: 'Heat transfer coefficient for the panel surface in W/(m²*K). Represents panel thermal resistance and heat loss rate to environment.',
   },
+  panelRefTemp: {
+    label: 'Reference Temp (°C)',
+    description: 'Reference temperature for efficiency rating in °C. Standard test condition is 25°C. Used as baseline for temperature coefficient calculations.',
+  },
+  panelTempCoefficient: {
+    label: 'Temp Coefficient (%/°C)',
+    description: 'Temperature coefficient for efficiency loss as a decimal. Typical value: 0.004 (-0.4% per °C). Efficiency decreases linearly with temperature above reference.',
+  },
   tankVolume: {
-    label: 'Tank Volume',
+    label: 'Tank Volume (L)',
     description: 'Total volume of the storage tank in liters. Larger tanks store more thermal energy but have more surface area for heat loss.',
   },
   initialTankTemp: {
-    label: 'Initial Tank Temp',
+    label: 'Initial Tank Temp (°C)',
     description: 'Starting temperature of the storage tank in °C. Typically matches ambient temperature at startup.',
   },
   tankSurfaceArea: {
-    label: 'Tank Surface Area',
+    label: 'Tank Surface Area (m²)',
     description: 'Exposed surface area of the storage tank in m². Used to calculate heat loss to environment.',
   },
   tankInsulationUValue: {
-    label: 'Tank U-Value',
+    label: 'Tank U-Value (W/m²·K)',
     description: 'Overall heat transfer coefficient for the tank insulation in W/(m²*K). Lower values indicate better insulation (less heat loss).',
   },
   massFlowRate: {
-    label: 'Mass Flow Rate',
+    label: 'Mass Flow Rate (kg/s)',
     description: 'Rate of fluid circulation through the solar panel in kg/s. Higher flow rates increase heat transfer but require more pump power.',
   },
   ambientTemp: {
-    label: 'Ambient Temperature',
+    label: 'Ambient Temperature (°C)',
     description: 'Surrounding air temperature in °C. Used for calculating heat loss from panel and tank to environment.',
-  },
-  initialVelocity: {
-    label: 'Initial Velocity',
-    description: 'Launch velocity of the projectile in m/s. Affects range and height of trajectory.',
-  },
-  angle: {
-    label: 'Launch Angle',
-    description: 'Angle of launch in degrees (0-90). 45° provides maximum range in ideal conditions.',
-  },
-  gravity: {
-    label: 'Gravity',
-    description: 'Gravitational acceleration in m/s². Earth: 9.81 m/s², Moon: 1.62 m/s².',
-  },
-  mass: {
-    label: 'Mass',
-    description: 'Mass of the projectile in kg. Affects drag force impact on trajectory.',
-  },
-  resistance: {
-    label: 'Air Resistance',
-    description: 'Air resistance coefficient. Higher values increase drag effect on trajectory.',
-  },
-  dragCoefficient: {
-    label: 'Drag Coefficient',
-    description: 'Dimensionless drag coefficient (Cd). Sphere: ~0.47, Streamlined: ~0.04. Affects air resistance.',
-  },
-  windSpeed: {
-    label: 'Wind Speed',
-    description: 'Wind speed in m/s. Affects projectile trajectory by applying lateral force.',
-  },
-  windAngle: {
-    label: 'Wind Angle',
-    description: 'Wind direction in degrees. 0° = head-on, 90° = perpendicular, 180° = tailwind.',
-  },
-  altitude: {
-    label: 'Altitude',
-    description: 'Launch altitude in meters above sea level. Higher altitude reduces air density and drag.',
   },
 }
 
@@ -184,37 +134,28 @@ const DEFAULT_PARAMETERS = {
   panelArea: 2.0,
   panelEfficiencyRef: 0.70,
   panelMaxTemp: 80.0,
-  panelUValue: 5.0,
+  panelUValue: 10.0,
+  panelRefTemp: 25.0,
+  panelTempCoefficient: 0.004,
   tankVolume: 200,
   initialTankTemp: 20.0,
   tankSurfaceArea: 2.0,
   tankInsulationUValue: 0.5,
   massFlowRate: 0.05,
   ambientTemp: 20.0,
-  initialVelocity: 20,
-  angle: 45,
-  gravity: 9.81,
-  mass: 1,
-  resistance: 0.1,
-  dragCoefficient: 0.5,
-  windSpeed: 5,
-  windAngle: 0,
-  altitude: 0,
 }
 
 function App() {
   const [parameters, setParameters] = useState(DEFAULT_PARAMETERS)
   const [plotData, setPlotData] = useState([])
-  const [activeSection, setActiveSection] = useState('solarIrradiance')
+  const [activeSection, setActiveSection] = useState('simulationParameters')
   const [pendingUpdates, setPendingUpdates] = useState({
+    simulationParameters: false,
     solarIrradiance: false,
     solarPanel: false,
     storageTank: false,
-    motion: false,
-    resistance: false,
-    environment: false,
   })
-  const [lastUpdatedSection, setLastUpdatedSection] = useState('solarIrradiance')
+  const [lastUpdatedSection, setLastUpdatedSection] = useState('simulationParameters')
 
 
   // Update plot when parameters for the last updated section change
@@ -226,8 +167,9 @@ function App() {
       newData = simulateSolarPanel(parameters)
     } else if (lastUpdatedSection === 'storageTank') {
       newData = simulateStorageTank(parameters)
-    } else {
-      newData = simulateProjectileMotion(parameters)
+    } else if (lastUpdatedSection === 'simulationParameters') {
+      // Simulation Parameters don't have their own plot, show the first available
+      newData = simulateSolarIrradiance(parameters)
     }
     setPlotData(newData)
   }, [parameters, lastUpdatedSection])
@@ -267,24 +209,20 @@ function App() {
   const handleReset = () => {
     setParameters(DEFAULT_PARAMETERS)
     setPendingUpdates({
+      simulationParameters: false,
       solarIrradiance: false,
       solarPanel: false,
       storageTank: false,
-      motion: false,
-      resistance: false,
-      environment: false,
     })
   }
 
   // Get axis titles based on the last updated section
   const getAxisTitles = () => {
     const titles = {
+      simulationParameters: { x: 'Time (hours)', y: 'Solar Irradiance (W/m²)', title: 'Solar Irradiance Profile' },
       solarIrradiance: { x: 'Time (hours)', y: 'Solar Irradiance (W/m²)', title: 'Solar Irradiance Profile' },
       solarPanel: { x: 'Time (hours)', y: 'Value', title: 'Solar Panel Performance (Temperature, Efficiency, Heat Output)' },
       storageTank: { x: 'Time (hours)', y: 'Value', title: 'Storage Tank Performance (Energy Balance and Temperature)' },
-      motion: { x: 'Distance (m)', y: 'Height (m)', title: 'Projectile Motion Trajectory' },
-      resistance: { x: 'Distance (m)', y: 'Height (m)', title: 'Trajectory with Drag Coefficient' },
-      environment: { x: 'Distance (m)', y: 'Height (m)', title: 'Environmental Effect on Trajectory' },
     }
     return titles[lastUpdatedSection] || titles.solarIrradiance
   }

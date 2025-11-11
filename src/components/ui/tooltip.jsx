@@ -28,13 +28,15 @@ export const Tooltip = ({ children, content, tooltipWidth = 0 }) => {
       </div>
       {isVisible && createPortal(
         <div
-          className="fixed px-3 py-2 bg-slate-900 text-slate-100 text-xs rounded-md border border-slate-700 whitespace-normal line-clamp-3 shadow-lg"
+          className="fixed px-3 py-2 bg-slate-900 text-slate-100 text-xs rounded-md border border-slate-700 whitespace-normal shadow-lg"
           style={{
             width: tooltipWidth > 0 ? `${tooltipWidth}px` : 'auto',
             top: `${position.top}px`,
             left: `${position.left}px`,
             zIndex: 9999,
-            transform: 'translateY(-100%)'
+            transform: 'translateY(-100%)',
+            maxHeight: '400px',
+            overflowY: 'auto'
           }}
         >
           {content}
