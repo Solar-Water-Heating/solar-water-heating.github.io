@@ -33,13 +33,11 @@ The solar irradiance is modeled as a cosine curve that peaks at a specified hour
 - **Peak Value**: Maximum solar radiation intensity in W/m² at peak hour. Standard value: 1000 W/m² at sea level on a clear day
 
 ### Formula
-\\[
-\\text{irradiance} = \\text{solarIrradiancePeak} \\times \\cos\\left((\\text{fraction} - \\text{peakFraction}) \\times \\pi\\right)
-\\]
+**irradiance = peakIrradiance × cos((fraction - peakFraction) × π)**
 
-where:
-- \`fraction\` = (t - startHour) / (endHour - startHour)
-- \`peakFraction\` = (peakHour - startHour) / (endHour - startHour)
+Where:
+- **fraction** = (time - startHour) / (endHour - startHour)
+- **peakFraction** = (peakHour - startHour) / (endHour - startHour)
 - Result is clamped to ≥ 0 (no negative irradiance)
 
 ### Physical Basis
@@ -59,33 +57,26 @@ Model solar panel performance including temperature-dependent efficiency, heat c
 Efficiency decreases as panel temperature increases due to thermal effects.
 
 **Formula:**
-\\[
-\\text{efficiency} = \\text{efficiencyRef} \\times \\left(1 - \\text{tempCoeff} \\times (T_{\\text{panel}} - T_{\\text{ref}})\\right)
-\\]
+**efficiency = efficiencyRef × (1 - tempCoeff × (panelTemp - refTemp))**
 
-- **Reference Efficiency**: Efficiency at standard test conditions (25°C). Typical solar panels: 15-22%
-- **Temperature Coefficient**: Typical value -0.4% per °C (represented as 0.004 fraction per °C)
-- **Clamping**: Efficiency is bounded between 10% and the reference efficiency
+Where:
+- **efficiencyRef**: Efficiency at standard test conditions (25°C). Typical solar panels: 15-22%
+- **tempCoeff**: Temperature coefficient. Typical value -0.4% per °C (represented as 0.004 fraction per °C)
+- **Result**: Efficiency is bounded between 10% and the reference efficiency
 
 #### Panel Temperature at Equilibrium
 At steady state, solar energy absorbed equals heat loss to the environment.
 
-**Formula:**
-\\[
-\\text{irradiance} \\times A \\times \\text{efficiency}(T) = U \\times A \\times (T - T_{\\text{ambient}})
-\\]
+**Energy Balance:**
+**irradiance × area × efficiency(T) = uValue × area × (T - ambientTemp)**
 
-Solving iteratively for panel temperature:
-\\[
-T_{\\text{panel}} = T_{\\text{ambient}} + \\frac{\\text{solarCollected}}{U \\times A}
-\\]
+**Solving for Panel Temperature:**
+**panelTemp = ambientTemp + (solarCollected / (uValue × area))**
 
 #### Heat Output
 Net heat collected by the panel (used to heat the storage tank):
 
-\\[
-Q_{\\text{panel}} = \\text{irradiance} \\times A \\times \\text{efficiency}(T_{\\text{panel}})
-\\]
+**Q_panel = irradiance × area × efficiency(panelTemp)**
 
 ### Parameters
 - **Panel Area** (m²): Total surface area of the solar panel
@@ -114,20 +105,16 @@ Simulate storage tank temperature profile over 24 hours with full energy balance
 The tank temperature changes based on net energy flow:
 
 **Energy Balance Equation:**
-\\[
-m \\times c_p \\times \\frac{dT}{dt} = Q_{\\text{in}} - Q_{\\text{loss}}
-\\]
+**m × c_p × dT/dt = Q_in - Q_loss**
 
-where:
-- \`m\` = tank mass (kg) ≈ tank volume (L) × 1 kg/L
-- \`c_p\` = specific heat of water = 4186 J/(kg·K)
-- \`Q_in\` = heat power from solar panel (W)
-- \`Q_loss\` = heat loss to environment (W)
+Where:
+- **m** = tank mass (kg) ≈ tank volume (L) × 1 kg/L
+- **c_p** = specific heat of water = 4186 J/(kg·K)
+- **Q_in** = heat power from solar panel (W)
+- **Q_loss** = heat loss to environment (W)
 
 **Heat Loss Calculation:**
-\\[
-Q_{\\text{loss}} = U \\times A \\times (T_{\\text{tank}} - T_{\\text{ambient}})
-\\]
+**Q_loss = uValue × area × (tankTemp - ambientTemp)**
 
 ### Simulation Method
 - **Time Step**: 10 seconds for numerical accuracy
